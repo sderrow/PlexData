@@ -3,9 +3,9 @@ library('dplyr')
 library('stringr')
 
 fix_errs = function(x) {
-  x = str_replace_all(x, '–', '-')
-  x = str_replace_all(x, '’', "'")
-  str_replace_all(x, '—', '-')
+  x = str_replace_all(x, '-', '-')
+  x = str_replace_all(x, "'", "'")
+  str_replace_all(x, '-', '-')
 }
 
 fsize = function(x) {
@@ -26,14 +26,24 @@ yrange = function(a, b) {
   ans
 }
 
-movies_raw = read_csv("Data/PlexMovieInput.csv")
-movies_clean = movies_raw[, c("Title", "Year", "Genres", "Duration", "Video Resolution", "Part Size", "Content Rating", "Summary", "Added", "Sort title")]
-colnames(movies_clean) = c("Title", "Year", "Genres", "Duration", "Resolution", "File Size", "Rating", "Summary", "Date Added", "Sort title")
-movies_clean = mutate_all(movies_clean, funs(fix_errs))
-write_excel_csv(movies_clean, "Data/SeanMovieLibrary.csv")
+clean_coll = function(x, y) {
+  x = ifelse(x=="N/A",y,x)
+  x = gsub("^The ", "", x)
+  x = gsub("^A ", "", x)
+  x
+}
 
-tv_raw = read_csv("Data/PlexTVInput.csv")
+movies_raw= read_csv("ExportTools/PlexMovieInput.csv", guess_max = 10^4)
+movies_clean = movies_raw[, c("Collections", "Title", "Year", "Genres", "Duration", "Video Resolution", "Part Size", "Content Rating", "Summary", "Added", "Sort title")]
+colnames(movies_clean) = c("Collections", "Title", "Year", "Genres", "Duration", "Resolution", "File Size", "Rating", "Summary", "Date Added", "Sort title")
+movies_clean = mutate_all(movies_clean, funs(fix_errs))
+movies_clean$Collections = clean_coll(movies_clean$Collections, movies_clean$`Sort title`)
+movies_clean = arrange(movies_clean, Collections, Year)
+write_excel_csv(movies_clean, "ExportTools/SeanMovieLibrary.csv")
+
+tv_raw = read_csv("ExportTools/PlexTVInput.csv", guess_max = 10^4)
 tv_raw$Year = as.integer(tv_raw$Year)
+tv_raw$`Part Size as Bytes` = unlist(lapply(lapply(str_split(tv_raw$`Part Size as Bytes`, ';'), as.numeric), mean))
 tv_clean = tv_raw %>%
   group_by(`Series Title`, Season) %>%
   summarize(Episodes = n(),
@@ -45,4 +55,5 @@ tv_clean = tv_raw %>%
             `Date Added` = max(Added, na.rm = TRUE)
             ) %>%
   ungroup()
-write_excel_csv(tv_clean, "Data/SeanTVLibrary.csv")
+write_excel_csv(tv_clean, "ExportTools/SeanTVLibrary.csv")
+  
